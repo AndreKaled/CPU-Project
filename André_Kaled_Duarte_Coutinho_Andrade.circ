@@ -3102,16 +3102,16 @@
       <a name="width" val="8"/>
     </comp>
     <comp lib="0" loc="(350,290)" name="Constant"/>
-    <comp lib="0" loc="(450,290)" name="Pin">
-      <a name="appearance" val="NewPins"/>
-      <a name="facing" val="west"/>
-      <a name="label" val="clock"/>
-      <a name="output" val="true"/>
-    </comp>
     <comp lib="0" loc="(500,360)" name="Pin">
       <a name="appearance" val="NewPins"/>
       <a name="facing" val="west"/>
       <a name="label" val="regis"/>
+      <a name="output" val="true"/>
+    </comp>
+    <comp lib="0" loc="(600,290)" name="Pin">
+      <a name="appearance" val="NewPins"/>
+      <a name="facing" val="west"/>
+      <a name="label" val="clock"/>
       <a name="output" val="true"/>
     </comp>
     <comp lib="0" loc="(670,320)" name="Pin">
@@ -3154,9 +3154,8 @@
     <wire from="(170,180)" to="(170,350)"/>
     <wire from="(170,350)" to="(340,350)"/>
     <wire from="(260,180)" to="(260,220)"/>
-    <wire from="(260,180)" to="(990,180)"/>
+    <wire from="(260,180)" to="(340,180)"/>
     <wire from="(260,270)" to="(260,400)"/>
-    <wire from="(260,270)" to="(380,270)"/>
     <wire from="(260,400)" to="(290,400)"/>
     <wire from="(260,470)" to="(330,470)"/>
     <wire from="(260,530)" to="(290,530)"/>
@@ -3165,10 +3164,13 @@
     <wire from="(290,490)" to="(290,530)"/>
     <wire from="(290,490)" to="(330,490)"/>
     <wire from="(320,370)" to="(340,370)"/>
+    <wire from="(340,180)" to="(340,270)"/>
+    <wire from="(340,180)" to="(990,180)"/>
+    <wire from="(340,270)" to="(380,270)"/>
     <wire from="(350,290)" to="(380,290)"/>
     <wire from="(380,360)" to="(420,360)"/>
     <wire from="(380,470)" to="(430,470)"/>
-    <wire from="(420,290)" to="(450,290)"/>
+    <wire from="(420,290)" to="(600,290)"/>
     <wire from="(430,380)" to="(430,470)"/>
     <wire from="(450,360)" to="(500,360)"/>
     <wire from="(670,320)" to="(700,320)"/>
