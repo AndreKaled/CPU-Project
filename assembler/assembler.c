@@ -54,7 +54,7 @@ MapaComando *buscaComando(const char *nome) {
     return NULL;
 }
 
-void geraBytecode(Instrucao in, FILE *out) {
+void geraBytecode(Instrucao in) {
     MapaComando *cmd = buscaComando(in.comando);
     if (!cmd) {
         printf("Comando desconhecido: %s\n", in.comando);
@@ -105,7 +105,7 @@ int main() {
 
         if (strlen(in.comando) == 0) continue;
 
-        geraBytecode(in, output);
+        geraBytecode(in);
     }
     salva(ram, pos, RAM_SIZE);
     return 0;
