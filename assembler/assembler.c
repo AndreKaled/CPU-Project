@@ -52,7 +52,7 @@ MapaComando *buscaComando(const char *nome) {
             return &comandos[i];
     }
     return NULL;
-}
+} 
 
 void geraBytecode(Instrucao in) {
     MapaComando *cmd = buscaComando(in.comando);
