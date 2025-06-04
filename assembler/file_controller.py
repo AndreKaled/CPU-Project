@@ -39,7 +39,3 @@ def salva(dados, pos, tam, output_file):
     
     output_file.close()
 
-inp, out = init()
-x = lerComando("DATA R0 00")
-ram = [0x20,0x00]
-salva(ram,1,256, out)
