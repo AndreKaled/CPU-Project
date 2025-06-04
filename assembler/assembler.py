@@ -45,7 +45,7 @@ def buscaComando(nome=""):
     return None
 
 def geraByteCode(instrucao, ram, pos):
-    cmd = buscaComando(instrucao.nome)
+    cmd = buscaComando(instrucao.comando)
     if cmd == None:
         print("Comando inválido: ", instrucao.comando)
         exit(1)
@@ -93,7 +93,7 @@ def main():
             continue
         pos = geraByteCode(instrucao, ram, pos)
     
-    salva(ram, pos, RAM_SIZE, output_file)
+    fc.salva(ram, pos, RAM_SIZE, output_file)
     exit(0)
     
 main()

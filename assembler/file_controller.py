@@ -21,8 +21,14 @@ def init():
 def lerComando(linha):
     trecho = linha.split()
     comando = trecho[0]
-    op1 = trecho[1]
-    op2 = trecho[2]
+    if len(trecho) > 1:
+        op1 = trecho[1]
+    else:
+        op1 = None
+    if len(trecho) > 2:
+        op2 = trecho[2] 
+    else: 
+        op2 = None 
     return Instrucao(comando, op1, op2)
 
 def salva(dados, pos, tam, output_file):
