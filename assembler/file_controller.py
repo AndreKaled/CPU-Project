@@ -1,6 +1,5 @@
+import sys
 INIT_CODE = "v3.0 hex words plain\n"
-FILE_INPUT = "input.asm"
-FILE_OUTPUT = "output.txt"
 
 class Instrucao:
     def __init__(self, comando="", op1="", op2=""):
@@ -9,6 +8,8 @@ class Instrucao:
         self.op2 = op2
 
 def init():
+    FILE_INPUT = sys.argv[1]
+    FILE_OUTPUT = sys.argv[2]
     try:
         input = open(FILE_INPUT, "r") 
         output = open(FILE_OUTPUT, "w")
@@ -19,7 +20,9 @@ def init():
         return None, None
 
 def lerComando(linha):
-    trecho = linha.split()
+    linha = linha.upper()
+    linha = linha.strip().split(";")
+    trecho = linha[0].split()
     comando = trecho[0]
     if len(trecho) > 1:
         op1 = trecho[1]
@@ -44,4 +47,3 @@ def salva(dados, pos, tam, output_file):
             output_file.write(" ")
     
     output_file.close()
-

@@ -1,4 +1,71 @@
-import file_controller as fc
+import sys
+import os
+INIT_CODE = "v3.0 hex words plain\n"
+
+class Instrucao:
+    def __init__(self, comando="", op1="", op2=""):
+        self.comando = comando
+        self.op1 = op1
+        self.op2 = op2
+
+def init():
+    try:
+        # checa se foi chamado corretamente
+        if len(sys.argv) < 3:
+            print("Uso do assembler: python3 montador.py <codigo.asm> <saida.txt>")
+            return None, None
+        
+        # checa se as extensões estão corretas
+        ext1 = os.path.splitext(sys.argv[1])[1][1:]
+        ext2 = os.path.splitext(sys.argv[2])[1][1:]
+        if ext1 != "asm" or ext2 != "txt":
+            print("Extensões inválidas dos argumentos: ")
+            if ext1 != "asm":
+                print("- Extensao de >>", sys.argv[1], "<< deve ser .asm!")
+                print(f"--- Você não queria dizer {os.path.splitext(sys.argv[1])[0]}.asm?")
+            if ext2 != "txt":
+                print("- Extensao de >>", sys.argv[2], "<< deve ser .txt!")
+                print(f"--- Você não queria dizer {os.path.splitext(sys.argv[2])[0]}.txt?")
+            return None, None
+        
+        # abre os arquivos e inicia a escrita padrão
+        input = open(sys.argv[1], "r") 
+        output = open(sys.argv[2], "w")
+        output.write(INIT_CODE)
+        return input, output
+    except IOError:
+        print("ERRO AO INICIAR ARQUIVOS.")
+        return None, None
+init()
+
+def lerComando(linha):
+    linha = linha.upper()
+    linha = linha.strip().split(";")
+    trecho = linha[0].split()
+    comando = trecho[0]
+    if len(trecho) > 1:
+        op1 = trecho[1]
+    else:
+        op1 = None
+    if len(trecho) > 2:
+        op2 = trecho[2] 
+    else: 
+        op2 = None 
+    return Instrucao(comando, op1, op2)
+
+def salva(dados, pos, tam, output_file):
+    vet = dados.copy()
+    for i in range(pos, tam):
+        vet.append(0x00)
+
+    for i in range(tam):
+        output_file.write(f"{vet[i]:02x}")
+        if (i+1) % 16 == 0:
+            output_file.write("\n")
+        else:
+            output_file.write(" ")
+    
+    output_file.close()
 
 RAM_SIZE = 256
 pos = 0
@@ -96,4 +163,3 @@ def main():
     fc.salva(ram, pos, RAM_SIZE, output_file)
     exit(0)
     
-main()
