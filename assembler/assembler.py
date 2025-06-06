@@ -27,7 +27,7 @@ comandos = [
     MapaComando("DATA", 0x20, 1),
     MapaComando("JMPR", 0x30, 0),
     MapaComando("JMP",  0x40, 1),
-    MapaComando("JC",   0x50, 1),MapaComando("JA",  0x54, 1),MapaComando("JE",    0x52, 1),MapaComando("JC",   0x51, 1),
+    MapaComando("JC",   0x50, 1),MapaComando("JA",  0x54, 1),MapaComando("JE",    0x52, 1),MapaComando("JZ",   0x51, 1),
     MapaComando("JCA",  0x5C, 1),MapaComando("JCE", 0x5A, 1),MapaComando("JCZ",   0x59, 1),MapaComando("JAE",  0x56, 1),
     MapaComando("JAZ",  0x55, 1),MapaComando("JEZ", 0x53, 1),MapaComando("JCAE",  0x5E, 1),MapaComando("JCAZ", 0x5D, 1),
     MapaComando("JCEZ", 0x5B, 1),MapaComando("JAEZ",0x57, 1),MapaComando("JCAEZ", 0x5F, 1),
@@ -76,8 +76,7 @@ def init():
         output.write(INIT_CODE)
         return input, output
     except FileNotFoundError:
-        if input == None:
-            print(f"ERRO: Arquivo {sys.argv[1]} não encontrado!")
+        print(f"ERRO: Arquivo {sys.argv[1]} não encontrado!")
         exit(1)
 
 # lê cada linha dado e transforma para o tipo Intrução
@@ -132,24 +131,26 @@ def geraByteCode(instrucao, ram, pos):
 
     # trata 0b, 0x ou decimal
     if instrucao.op1 != None and not instrucao.op1.startswith("R"):
-        op = instrucao.op1.strip()
-        if op.startswith("0X"):
-            op = int(op, 16)
-        elif op.startswith("0B"):
-            op = int(op, 2)  
+        dado= instrucao.op1.strip()
+        if dado.startswith("0X"):
+            dado= int(dado, 16)
+        elif dado.startswith("0B"):
+            dado= int(dado, 2)  
         else:
-            op = int(op)
-        instrucao.op1 = op
-        print(instrucao.op1)  
+            dado= int(dado)
+        instrucao.op1 = dado
     if instrucao.op2 != None and not instrucao.op2.startswith("R"):
-        op = instrucao.op2.strip()
-        if op.startswith("0X"):
-            op = int(op, 16)
-        elif op.startswith("0B"):
-            op = int(op, 2)  
+        dado= instrucao.op2.strip()
+        if dado.startswith("0X"):
+            dado= int(dado, 16)
+        elif dado.startswith("0B"):
+            dado= int(dado, 2)  
         else:
-            op = int(op)  
-        instrucao.op2 = op 
+            dado= int(dado)
+            if dado< 0:
+                dado= (1<<8) + dado
+                dado= dado& 0xFF # garante que nao passa de 256
+        instrucao.op2 = dado
 
     if (instrucao.comando == "LD" or instrucao.comando == "ST" or 
         instrucao.comando == "ADD" or instrucao.comando == "SHR" or 
