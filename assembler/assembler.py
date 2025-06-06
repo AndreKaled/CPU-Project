@@ -2,79 +2,24 @@ import sys
 import os
 INIT_CODE = "v3.0 hex words plain\n"
 
+# classe de instrucao (era uma struct), para traduzir a gramatica regular do assembly
 class Instrucao:
     def __init__(self, comando="", op1="", op2=""):
         self.comando = comando
         self.op1 = op1
         self.op2 = op2
 
-def init():
-    try:
-        # checa se foi chamado corretamente
-        if len(sys.argv) < 3:
-            print("Uso do assembler: python3 montador.py <codigo.asm> <saida.txt>")
-            return None, None
-        
-        # checa se as extensões estão corretas
-        ext1 = os.path.splitext(sys.argv[1])[1][1:]
-        ext2 = os.path.splitext(sys.argv[2])[1][1:]
-        if ext1 != "asm" or ext2 != "txt":
-            print("Extensões inválidas dos argumentos: ")
-            if ext1 != "asm":
-                print("- Extensao de >>", sys.argv[1], "<< deve ser .asm!")
-                print(f"--- Você não queria dizer {os.path.splitext(sys.argv[1])[0]}.asm?")
-            if ext2 != "txt":
-                print("- Extensao de >>", sys.argv[2], "<< deve ser .txt!")
-                print(f"--- Você não queria dizer {os.path.splitext(sys.argv[2])[0]}.txt?")
-            return None, None
-        
-        # abre os arquivos e inicia a escrita padrão
-        input = open(sys.argv[1], "r") 
-        output = open(sys.argv[2], "w")
-        output.write(INIT_CODE)
-        return input, output
-    except IOError:
-        print("ERRO AO INICIAR ARQUIVOS.")
-        return None, None
-init()
+# dicionario para ter a instrucao hexadecimal como base, modificando com registradores ou addr
+class MapaComando:
+    def __init__(self, nome="", codigoHex="", usaSegundobyte=""):
+        self.nome = nome
+        self.codigoHex = codigoHex
+        self.usaSegundoByte = usaSegundobyte
 
-def lerComando(linha):
-    linha = linha.upper()
-    linha = linha.strip().split(";")
-    trecho = linha[0].split()
-    comando = trecho[0]
-    if len(trecho) > 1:
-        op1 = trecho[1]
-    else:
-        op1 = None
-    if len(trecho) > 2:
-        op2 = trecho[2] 
-    else: 
-        op2 = None 
-    return Instrucao(comando, op1, op2)
-
-def salva(dados, pos, tam, output_file):
-    vet = dados.copy()
-    for i in range(pos, tam):
-        vet.append(0x00)
-
-    for i in range(tam):
-        output_file.write(f"{vet[i]:02x}")
-        if (i+1) % 16 == 0:
-            output_file.write("\n")
-        else:
-            output_file.write(" ")
-    
-    output_file.close()
-
+# simulador da ram
 RAM_SIZE = 256
 pos = 0
 ram = [0x00] * RAM_SIZE
-class MapaComando:
-    def __init__(self, nome="", baseOpCode="", usaSegundobyte=""):
-        self.nome = nome
-        self.baseOpCode = baseOpCode
-        self.usaSegundoByte = usaSegundobyte
 
 comandos = [
     MapaComando("LD",   0x00, 0),
@@ -99,26 +44,113 @@ comandos = [
     MapaComando("CMP",  0xF0, 0)
 ]
 
+# inicializa arquivos dos argumentos
+# obs: o segundo argumento, quando nao existir mas foi dado um nome, 
+# será criado pelo programa com o mesmo nome
+def init():
+    input = None
+    output = None
+    try:
+        # checa se foi chamado corretamente
+        if len(sys.argv) < 3:
+            print("Há argumentos faltando! Use: python3 montador.py <codigo.asm> <saida.txt>")
+            exit(1)
+        if len(sys.argv) > 3:
+            print("Há argumentos demais! Use: python3 montador.py <codigo.asm> <saida.txt>")
+            exit(1)
+
+        # checa se as extensões estão corretas
+        ext1 = os.path.splitext(sys.argv[1])[1][1:]
+        ext2 = os.path.splitext(sys.argv[2])[1][1:]
+        if ext1 != "asm" or ext2 != "txt":
+            print("Extensões inválidas dos argumentos: ")
+            if ext1 != "asm":
+                print(f"Você não queria dizer {os.path.splitext(sys.argv[1])[0]}.asm?")
+            if ext2 != "txt":
+                print(f"Você não queria dizer {os.path.splitext(sys.argv[2])[0]}.txt?")
+            exit(1)
+        
+        # abre os arquivos e inicia a escrita padrão
+        input = open(sys.argv[1], "r") 
+        output = open(sys.argv[2], "w")
+        output.write(INIT_CODE)
+        return input, output
+    except FileNotFoundError:
+        if input == None:
+            print(f"ERRO: Arquivo {sys.argv[1]} não encontrado!")
+        exit(1)
+
+# lê cada linha dado e transforma para o tipo Intrução
+def lerComando(linha):
+    linha = linha.upper()
+    linha = linha.strip().split(";")[0] ## ignora o comentario
+    trecho = linha.split()
+    comando = trecho[0]
+    op1 = None
+    op2 = None 
+    if len(trecho) > 1:
+        op1 = trecho[1]
+    if len(trecho) > 2:
+        op2 = trecho[2] 
+    return Instrucao(comando, op1, op2)
+
+# salva os dados do vetor "ram" para o arquivo de saída
+def salva(dados, pos, tam, output_file):
+    vet = dados.copy()
+    for i in range(pos, tam):
+        vet.append(0x00)
+
+    for i in range(tam):
+        output_file.write(f"{vet[i]:02x}")
+        if (i+1) % 16 == 0:
+            output_file.write("\n")
+        else:
+            output_file.write(f" ")
+    
+    output_file.close()
+
+# converte o registrador em número
 def regToNum(reg=""):
     if (len(reg) != 2) or (reg[0] != 'R') or not reg[1].isdigit() or (int(reg[1]) < 0) or(int(reg[1]) > 3):
         print("Registrador inválido: ", reg)
         exit(1)
     return int(reg[1])
 
+# recebe o nome da instrucao e busca se existe um comando com o mesmo nome
 def buscaComando(nome=""):
     for comando in comandos:
         if(comando.nome == nome):
             return comando
-    return None
+    print(f"ERRO: Comando {nome} inválido!")
+    exit(1)
 
+# converte a instrucao em byte, faz a manipulação bit a bit conforme os registradores ou addr
 def geraByteCode(instrucao, ram, pos):
     cmd = buscaComando(instrucao.comando)
-    if cmd == None:
-        print("Comando inválido: ", instrucao.comando)
-        exit(1)
-        
-    byte1 = cmd.baseOpCode
+    byte1 = cmd.codigoHex
     byte2 = 0x00
+
+    # trata 0b, 0x ou decimal
+    if instrucao.op1 != None and not instrucao.op1.startswith("R"):
+        op = instrucao.op1.strip()
+        if op.startswith("0X"):
+            op = int(op, 16)
+        elif op.startswith("0B"):
+            op = int(op, 2)  
+        else:
+            op = int(op)
+        instrucao.op1 = op
+        print(instrucao.op1)  
+    if instrucao.op2 != None and not instrucao.op2.startswith("R"):
+        op = instrucao.op2.strip()
+        if op.startswith("0X"):
+            op = int(op, 16)
+        elif op.startswith("0B"):
+            op = int(op, 2)  
+        else:
+            op = int(op)  
+        instrucao.op2 = op 
+
     if (instrucao.comando == "LD" or instrucao.comando == "ST" or 
         instrucao.comando == "ADD" or instrucao.comando == "SHR" or 
         instrucao.comando == "SHL" or instrucao.comando == "NOT" or 
@@ -127,19 +159,19 @@ def geraByteCode(instrucao, ram, pos):
         byte1 |= (regToNum(instrucao.op1) << 2) | regToNum(instrucao.op2)
     elif instrucao.comando == "DATA": # data usa 2 bytes
         byte1 |= regToNum(instrucao.op1)
-        byte2 = int(instrucao.op2, 16)
+        byte2 = instrucao.op2
     elif instrucao.comando == "IN" or instrucao.comando == "OUT":
-        tipo = int(instrucao.op1, 16)
-        reg = regToNum(instrucao.op2)
+        tipo = instrucao.op1
+        reg = instrucao.op2
         # caso de ativacao
         if tipo == 0x11:
             byte1 |= 0x0c | reg # 0111 11RB
         else:
             byte1 |= (tipo << 2) | reg #0111 TTRB
     elif cmd.usaSegundoByte == 1: # para jumps 
-        byte2 = int(instrucao.op1, 16)
+        byte2 = instrucao.op1
         
-    #modifica a "RAM"
+    # modifica a "RAM"
     ram[pos] = byte1
     pos = pos + 1
     if(cmd.usaSegundoByte == 1):
@@ -147,19 +179,18 @@ def geraByteCode(instrucao, ram, pos):
         pos = pos + 1
     return pos
 
+# funcao principal
 def main():
-    input_file, output_file = fc.init()
-    if input_file == None or output_file == None:
-        exit(1)
+    input_file, output_file = init()
     
     pos = 0
     for linha in input_file:
         linha = linha.strip()
-        instrucao = fc.lerComando(linha)
-        if len(instrucao.comando) == 0:
-            continue
-        pos = geraByteCode(instrucao, ram, pos)
+        instrucao = lerComando(linha)
+        if len(instrucao.comando) > 0:
+            pos = geraByteCode(instrucao, ram, pos)
     
-    fc.salva(ram, pos, RAM_SIZE, output_file)
+    salva(ram, pos, RAM_SIZE, output_file)
     exit(0)
     
+main()
