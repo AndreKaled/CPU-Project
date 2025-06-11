@@ -2,6 +2,17 @@ import sys
 import os
 INIT_CODE = "v3.0 hex words plain\n"
 
+# capacidade maxima de dado (considerando complemento de dois)
+BYTE_SIZE = 1
+TOTAL_BITS = BYTE_SIZE * 8
+MAX_POSITIVO = (1 << (TOTAL_BITS - 1)) -1
+MIN_NEGATIVO = -(1 << (TOTAL_BITS - 1))
+
+# mascara para garantir que caiba na RAM
+# desloca bits e subtrai 1
+MASCARA = (1 << TOTAL_BITS) - 1
+COMPLEMENTO_DOIS = (1 << TOTAL_BITS)
+
 # classe de instrucao (era uma struct), para traduzir a gramatica regular do assembly
 class Instrucao:
     def __init__(self, comando="", op1="", op2=""):
@@ -123,34 +134,53 @@ def buscaComando(nome=""):
     print(f"ERRO: Comando {nome} inválido!")
     exit(1)
 
+def trataDado(op):
+    if op != None and not op.startswith("R"):
+        tmp = op.strip()
+        numeroInicial = None
+        if tmp.startswith("0X"):
+            numeroInicial = int(tmp, 16)
+            if numeroInicial > MASCARA:
+                print(f"ERRO: o hexadecimal {op} não cabe "
+                      f"em {TOTAL_BITS} bits (max:{hex(MASCARA)})")
+                exit(1)
+        elif tmp.startswith("0B"):
+            numeroInicial = int(tmp, 2)  
+            if numeroInicial > MASCARA:
+                print(f"ERRO: o binário {op} não cabe "
+                      f"em {TOTAL_BITS} bits (max:{bin(MASCARA)})")
+                exit(1)
+        else:
+            try:
+                numeroInicial = int(tmp)
+                if numeroInicial < MIN_NEGATIVO or numeroInicial > MAX_POSITIVO:
+                    print(f"ERRO: o número {op} está fora do "
+                          f"intervalo [{MIN_NEGATIVO},{MAX_POSITIVO}]")
+                    exit(1)
+                if numeroInicial < 0:
+                    numeroInicial = COMPLEMENTO_DOIS + numeroInicial
+            except ValueError:
+                print(f"ERRO: valor {op} não é um número válido")
+                exit(1)
+        
+        valorMascarado = numeroInicial & MASCARA
+        # ve se o bit de sinal está ligado e retorna em complemento de dois
+        if valorMascarado & (1 << (TOTAL_BITS -1)) != 0:
+            return (valorMascarado - COMPLEMENTO_DOIS) & MASCARA
+        
+        # valor positivo
+        else:
+            return valorMascarado
+    return op
+
 # converte a instrucao em byte, faz a manipulação bit a bit conforme os registradores ou addr
 def geraByteCode(instrucao, ram, pos):
     cmd = buscaComando(instrucao.comando)
     byte1 = cmd.codigoHex
     byte2 = 0x00
 
-    # trata 0b, 0x ou decimal
-    if instrucao.op1 != None and not instrucao.op1.startswith("R"):
-        dado= instrucao.op1.strip()
-        if dado.startswith("0X"):
-            dado= int(dado, 16)
-        elif dado.startswith("0B"):
-            dado= int(dado, 2)  
-        else:
-            dado= int(dado)
-        instrucao.op1 = dado
-    if instrucao.op2 != None and not instrucao.op2.startswith("R"):
-        dado= instrucao.op2.strip()
-        if dado.startswith("0X"):
-            dado= int(dado, 16)
-        elif dado.startswith("0B"):
-            dado= int(dado, 2)  
-        else:
-            dado= int(dado)
-            if dado< 0:
-                dado= (1<<8) + dado
-                dado= dado& 0xFF # garante que nao passa de 256
-        instrucao.op2 = dado
+    instrucao.op1 = trataDado(instrucao.op1)
+    instrucao.op2 = trataDado(instrucao.op2)
 
     if (instrucao.comando == "LD" or instrucao.comando == "ST" or 
         instrucao.comando == "ADD" or instrucao.comando == "SHR" or 
