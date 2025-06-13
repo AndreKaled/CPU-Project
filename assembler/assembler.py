@@ -32,16 +32,14 @@ RAM_SIZE = 256
 pos = 0
 ram = [0x00] * RAM_SIZE
 
+flags_jcaez = {"C": 0x8, "A":0x4, "E": 0x2, "Z":0x1}
+
 comandos = [
     MapaComando("LD",   0x00, 0),
     MapaComando("ST",   0x10, 0),
     MapaComando("DATA", 0x20, 1),
     MapaComando("JMPR", 0x30, 0),
     MapaComando("JMP",  0x40, 1),
-    MapaComando("JC",   0x50, 1),MapaComando("JA",  0x54, 1),MapaComando("JE",    0x52, 1),MapaComando("JZ",   0x51, 1),
-    MapaComando("JCA",  0x5C, 1),MapaComando("JCE", 0x5A, 1),MapaComando("JCZ",   0x59, 1),MapaComando("JAE",  0x56, 1),
-    MapaComando("JAZ",  0x55, 1),MapaComando("JEZ", 0x53, 1),MapaComando("JCAE",  0x5E, 1),MapaComando("JCAZ", 0x5D, 1),
-    MapaComando("JCEZ", 0x5B, 1),MapaComando("JAEZ",0x57, 1),MapaComando("JCAEZ", 0x5F, 1),
     MapaComando("CLF",  0x60, 0),
     MapaComando("IN",   0x70, 0),
     MapaComando("OUT",  0x78, 0),
@@ -92,17 +90,16 @@ def init():
 
 # lê cada linha dado e transforma para o tipo Intrução
 def lerComando(linha):
-    linha = linha.upper()
-    linha = linha.strip().split(";")[0] ## ignora o comentario
-    trecho = linha.split()
-    comando = trecho[0]
-    op1 = None
-    op2 = None 
-    if len(trecho) > 1:
-        op1 = trecho[1]
-    if len(trecho) > 2:
-        op2 = trecho[2] 
-    return Instrucao(comando, op1, op2)
+    linha = linha.upper().split(";")[0].strip()
+    linha = linha.replace(",", " ")
+    partes = linha.split()
+    if not partes:
+        return None
+
+    cmd = partes[0]
+    op1 = partes[1] if len(partes) > 1 else None
+    op2 = partes[2] if len(partes) > 2 else None
+    return Instrucao(cmd, op1, op2)
 
 # salva os dados do vetor "ram" para o arquivo de saída
 def salva(dados, pos, tam, output_file):
@@ -128,6 +125,10 @@ def regToNum(reg=""):
 
 # recebe o nome da instrucao e busca se existe um comando com o mesmo nome
 def buscaComando(nome=""):
+    if (nome.startswith("JC") or nome.startswith("JA") or 
+    nome.startswith("JE") or nome.startswith("JZ")):
+        return MapaComando(nome, 0x50, 1)
+
     for comando in comandos:
         if(comando.nome == nome):
             return comando
@@ -135,7 +136,7 @@ def buscaComando(nome=""):
     exit(1)
 
 def trataDado(op):
-    if op != None and not op.startswith("R"):
+    if op != None and not op.startswith("R") and op not in {"DATA", "ADDR"}:
         tmp = op.strip()
         numeroInicial = None
         if tmp.startswith("0X"):
@@ -173,6 +174,16 @@ def trataDado(op):
             return valorMascarado
     return op
 
+def flags(jcaez):
+    jcaez = jcaez[1:]
+    if len(jcaez) > 4:
+        print("ERRO: Há um JCAEZ com flags a mais do que esperado!")
+        exit(1)
+    hex = 0x0
+    for let in jcaez:
+        hex += flags_jcaez[let]
+    return hex
+
 # converte a instrucao em byte, faz a manipulação bit a bit conforme os registradores ou addr
 def geraByteCode(instrucao, ram, pos):
     cmd = buscaComando(instrucao.comando)
@@ -194,12 +205,19 @@ def geraByteCode(instrucao, ram, pos):
     elif instrucao.comando == "IN" or instrucao.comando == "OUT":
         tipo = instrucao.op1
         reg = instrucao.op2
-        # caso de ativacao
-        if tipo == 0x11:
-            byte1 |= 0x0c | reg # 0111 11RB
+        in_out = 1 if instrucao.comando == "OUT" else 0
+        if tipo == "ADDR":
+            byte1 |= (in_out << 3) | (1 << 2) | regToNum(reg)
+        elif tipo == "DATA":
+            byte1 |= (in_out << 3) | (0 << 2) | regToNum(reg)
         else:
-            byte1 |= (tipo << 2) | reg #0111 TTRB
+            print("Operando inválido para IN/OUT")
+            exit(1)
+    elif cmd.nome == "JMPR":
+        byte1 |= regToNum(instrucao.op1)
     elif cmd.usaSegundoByte == 1: # para jumps 
+        if cmd.nome != "JMP" and cmd.nome != "JMPR":
+            byte1|= flags(cmd.nome)
         byte2 = instrucao.op1
         
     # modifica a "RAM"
@@ -218,7 +236,7 @@ def main():
     for linha in input_file:
         linha = linha.strip()
         instrucao = lerComando(linha)
-        if len(instrucao.comando) > 0:
+        if instrucao:
             pos = geraByteCode(instrucao, ram, pos)
     
     salva(ram, pos, RAM_SIZE, output_file)
