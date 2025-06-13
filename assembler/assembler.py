@@ -1,5 +1,6 @@
 """
-Aluno: [André Kaled]
+Aluno: [André Kaled Duarte Coutinho Andrade]
+Matricula: [22450837]
 """
 
 import sys
@@ -12,6 +13,7 @@ MAX_POSITIVO = (1 << (TOTAL_BITS - 1)) -1 # maior positivo com complemento de do
 MIN_NEGATIVO = -(1 << (TOTAL_BITS - 1))   # menor negativo com complemento de dois
 MASCARA = (1 << TOTAL_BITS) - 1           # mascara para garantir que caiba na RAM
 COMPLEMENTO_DOIS = (1 << TOTAL_BITS)      # desloca bits e subtrai 1
+MAX_MEMORIA = (1 << TOTAL_BITS)           # maior hexadecimal armazenavel na memoria
 
 # classe de instrucao (era uma struct), para traduzir a gramatica regular do assembly
 class Instrucao:
@@ -66,7 +68,6 @@ def init():
     except FileNotFoundError:
         print(f"ERRO: Arquivo {sys.argv[1]} não encontrado!")
         exit(1)
-
 
 def lerComando(linha):
     """ # A função recebe uma linha do arquivo de input e transforma para o tipo Intrução [comando, operador1, operador2], usado """
@@ -128,7 +129,7 @@ def trataDado(op):
                 exit(1)
         else:
             try:
-                numeroInicial = int(op)
+                numeroInicial = int(op) 
                 if numeroInicial < MIN_NEGATIVO or numeroInicial > MAX_POSITIVO:
                     print(f"ERRO: o número {op} está fora do "
                           f"intervalo [{MIN_NEGATIVO},{MAX_POSITIVO}]")
@@ -147,6 +148,36 @@ def trataDado(op):
             return valorMascarado
     return op
 
+def trataDadoJMP(op):
+    if op != None and not op.startswith("R") and op not in {"DATA", "ADDR"}:
+        numeroInicial = None
+        if op.startswith("0X"):
+            numeroInicial = int(op, 16)
+            if numeroInicial > MASCARA:
+                print(f"ERRO: o hexadecimal {op} não cabe "
+                      f"em {TOTAL_BITS} bits (max:{hex(MASCARA)})")
+                exit(1)
+        elif op.startswith("0B"):
+            numeroInicial = int(op, 2)  
+            if numeroInicial > MASCARA:
+                print(f"ERRO: o binário {op} não cabe "
+                      f"em {TOTAL_BITS} bits (max:{bin(MASCARA)})")
+                exit(1)
+        else:
+            try:
+                numeroInicial = int(op) 
+                if numeroInicial < 0 or numeroInicial > MASCARA:
+                    print(f"ERRO: o número {op} está fora do "
+                          f"intervalo [0,{MASCARA}]")
+                    exit(1)
+            except ValueError:
+                print(f"ERRO: valor {op} não é um número válido")
+                exit(1)
+        valorMascarado = numeroInicial & MASCARA
+        return valorMascarado
+    return op
+
+
 def flags(jcaez):
     jcaez = jcaez[1:]
     if len(jcaez) > 4:
@@ -161,16 +192,19 @@ def flags(jcaez):
 def geraByteCode(instrucao, ram, pos):
     byte1 = buscaComando(instrucao.comando)
     byte2 = 0x00
-    instrucao.op1 = trataDado(instrucao.op1)
-    instrucao.op2 = trataDado(instrucao.op2)
-    print(instrucao.comando)
     if (instrucao.comando == "LD" or instrucao.comando == "ST" or instrucao.comando == "ADD" or instrucao.comando == "SHR" or instrucao.comando == "SHL" or 
         instrucao.comando == "NOT" or instrucao.comando == "AND" or instrucao.comando == "OR" or instrucao.comando == "XOR" or instrucao.comando == "CMP"):
+        instrucao.op1 = trataDado(instrucao.op1)
+        instrucao.op2 = trataDado(instrucao.op2)
         byte1 |= (regToNum(instrucao.op1) << 2) | regToNum(instrucao.op2)
     elif instrucao.comando == "DATA": # data usa 2 bytes
+        instrucao.op1 = trataDado(instrucao.op1)
+        instrucao.op2 = trataDado(instrucao.op2)
         byte1 |= regToNum(instrucao.op1)
         byte2 = instrucao.op2
     elif instrucao.comando == "IN" or instrucao.comando == "OUT":
+        instrucao.op1 = trataDado(instrucao.op1)
+        instrucao.op2 = trataDado(instrucao.op2)
         tipo = instrucao.op1
         reg = instrucao.op2
         in_out = 1 if instrucao.comando == "OUT" else 0
@@ -184,6 +218,7 @@ def geraByteCode(instrucao, ram, pos):
     elif instrucao.comando == "JMPR":
         byte1 |= regToNum(instrucao.op1)
     elif instrucao.comando.startswith("J"): # para jumps 
+        instrucao.op1 = trataDadoJMP(instrucao.op1)
         if instrucao.comando != "JMP" and instrucao.comando != "JMPR":
             byte1|= flags(instrucao.comando)
         byte2 = instrucao.op1
@@ -191,7 +226,7 @@ def geraByteCode(instrucao, ram, pos):
     # modifica a "RAM"
     ram[pos] = byte1
     pos = pos + 1
-    if byte2:
+    if byte2 or (instrucao.comando.startswith("J") and instrucao.comando != "JMPR"):
         ram[pos] = byte2
         pos = pos + 1
     return pos
