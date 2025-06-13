@@ -70,7 +70,7 @@ def init():
         exit(1)
 
 def lerComando(linha):
-    """ # A função recebe uma linha do arquivo de input e transforma para o tipo Intrução [comando, operador1, operador2], usado """
+    """ A função recebe uma linha do arquivo de input e transforma para o tipo Intrução [comando, operador1, operador2] usado"""
     linha = linha.upper().split(";")[0].strip()
     linha = linha.replace(",", " ")
     partes = linha.split()
@@ -81,8 +81,10 @@ def lerComando(linha):
     op2 = partes[2] if len(partes) > 2 else None
     return Instrucao(cmd, op1, op2)
 
-# salva os dados do vetor "ram" para o arquivo de saída
 def salva(dados, pos, tam, output_file):
+    """ Passa todos os dados salvos na "RAM" recebida para o arquivo de saída. 
+        Quando a "RAM" está incompleta, a função preenche o vazio com 0x00
+    """
     vet = dados.copy()
     for i in range(pos, tam):
         vet.append(0x00)
@@ -94,15 +96,17 @@ def salva(dados, pos, tam, output_file):
         else:
             output_file.write(f" ")
 
-# converte o registrador em número
+
 def regToNum(reg=""):
+    """ recebe como argumento um registrador e o converte em número """
     if (len(reg) != 2) or (reg[0] != 'R') or not reg[1].isdigit() or (int(reg[1]) < 0) or(int(reg[1]) > 3):
         print("ERRO: registrador inválido: ", reg)
         exit(1)
     return int(reg[1])
 
-# recebe o nome da instrucao e busca se existe um comando com o mesmo nome
+
 def buscaComando(nome=""):
+     """ recebe o nome da instrucao e busca no dicionario se existe um comando com o mesmo nome """
     if (nome.startswith("JC") or nome.startswith("JA") or 
     nome.startswith("JE") or nome.startswith("JZ")):
         return 0x50
