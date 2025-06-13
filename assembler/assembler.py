@@ -146,6 +146,9 @@ def trataDado(op):
         # valor positivo
         else:
             return valorMascarado
+    if not op:
+        print("ERRO: está faltando argumentos em uma instrução")
+        exit(1)
     return op
 
 def trataDadoJMP(op):
@@ -175,6 +178,9 @@ def trataDadoJMP(op):
                 exit(1)
         valorMascarado = numeroInicial & MASCARA
         return valorMascarado
+    if not op:
+        print("ERRO: Jump sem destino.")
+        exit(1)
     return op
 
 
