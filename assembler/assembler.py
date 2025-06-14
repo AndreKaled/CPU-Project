@@ -55,9 +55,9 @@ def init():
             exit(1)
         if os.path.splitext(sys.argv[1])[1][1:] != "asm" or os.path.splitext(sys.argv[2])[1][1:] != "txt":
             print("ERRO: Extensões inválidas dos argumentos. ")
-            if ext1 != "asm":
+            if os.path.splitext(sys.argv[1])[1][1:] != "asm":
                 print(f"Você não queria dizer {os.path.splitext(sys.argv[1])[0]}.asm?")
-            if ext2 != "txt":
+            if os.path.splitext(sys.argv[2])[1][1:] != "txt":
                 print(f"Você não queria dizer {os.path.splitext(sys.argv[2])[0]}.txt?")
             exit(1)
         # abre os arquivos e inicia a escrita padrão
