@@ -1,6 +1,6 @@
 """
 Aluno: [André Kaled Duarte Coutinho Andrade]
-Matricula: [22450837]
+Matricula: [2021333729]
 """
 
 import sys
@@ -106,7 +106,7 @@ def regToNum(reg=""):
 
 
 def buscaComando(nome=""):
-     """ recebe o nome da instrucao e busca no dicionario se existe um comando com o mesmo nome """
+    """ recebe o nome da instrucao e busca no dicionario se existe um comando com o mesmo nome """
     if (nome.startswith("JC") or nome.startswith("JA") or 
     nome.startswith("JE") or nome.startswith("JZ")):
         return 0x50
@@ -117,6 +117,8 @@ def buscaComando(nome=""):
         exit(1)
 
 def trataDado(op):
+    """ converte um argumento (bin, hex, dec) em hexadecimal, isso quando não
+        for data, addr (para in/out) e registrador"""
     if op != None and not op.startswith("R") and op not in {"DATA", "ADDR"}:
         numeroInicial = None
         if op.startswith("0X"):
@@ -156,6 +158,8 @@ def trataDado(op):
     return op
 
 def trataDadoJMP(op):
+    """ converte argumento em hexadecimal, considerando apenas 
+     memória, sem complemento de dois """
     if op != None and not op.startswith("R") and op not in {"DATA", "ADDR"}:
         numeroInicial = None
         if op.startswith("0X"):
@@ -189,6 +193,7 @@ def trataDadoJMP(op):
 
 
 def flags(jcaez):
+    """ aciona as flags do jumper """
     jcaez = jcaez[1:]
     if len(jcaez) > 4:
         print("ERRO: Há um JCAEZ com flags a mais do que esperado!")
@@ -198,8 +203,10 @@ def flags(jcaez):
         hex += flags_jcaez[let]
     return hex
 
-# converte a instrucao em byte, faz a manipulação bit a bit conforme os registradores ou addr
 def geraByteCode(instrucao, ram, pos):
+    """ converte a instrucao em byte, faz a manipulação bit a 
+    bit conforme os registradores ou addr
+    """
     byte1 = buscaComando(instrucao.comando)
     byte2 = 0x00
     if (instrucao.comando == "LD" or instrucao.comando == "ST" or instrucao.comando == "ADD" or instrucao.comando == "SHR" or instrucao.comando == "SHL" or 
@@ -243,6 +250,7 @@ def geraByteCode(instrucao, ram, pos):
 
 # funcao principal
 def main():
+    """ função principal do programa, faz a montagem """
     input_file, output_file = init()
     pos = 0
     for linha in input_file:
@@ -252,7 +260,7 @@ def main():
             pos = geraByteCode(instrucao, ram, pos)
     
     salva(ram, pos, RAM_SIZE, output_file)
-    print(f"Processado com sucesso, arquivo em {sys.argv[2]}")
+    print(f"Processado com sucesso, arquivo salvo em {sys.argv[2]}")
     output_file.close()
     input_file.close()
     exit(0)
