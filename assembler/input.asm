@@ -1,95 +1,53 @@
-data r0,0x30 ; comentário: dado hexadecimal 
+; guarda dados no vetor
+data r0 1
 
-DATA r1, 06  ; dado em decimal
+data r1 1 
 
-DATA r1, -06  ; dado em decimal
+data r2 0x30 ; controla a memoria (posicao do vetor), marca o fim do vetor
 
+; guarda ate acabar as instrucoes abaixo
+add r2 r3 ; R3 marca o inicio do vetor
+st r2 r0 ; guarda 1
+add r1 r0
+add r1 r2
+st r2 r0 ; guarda 2
+add r1 r0
+add r1 r2
+st r2 r0 ; guarda 3
 
+clf
+cmp r2 r3
+ja 0x14 ; aqui tem que comecar a trocar
 
-dAta r2,0b00001000 ; dado binário
+jmp 0x12 ; loop de fim do programa
 
-  data r3,0xff
+; trocas do vetor
 
+ld r3 r0 ; carrega x em r0
+ld r2 r1 ; carrega y em r1
+st r2 r3 ; guarda ponteiro Pinicio no final (onde vai ter a troca)
+data r3 0x00 ; limpa para tmp
 
+; troca r0 com r1
+add r0 r3 
+data r0 0x00
 
-; comentário 2
+add r1 r0
+data r1 0x00
 
-shr R0,R1    
+add r3 r1
 
-shl   r3,r2
+ld r2 r3 ; carrega ponteiro Pinicio em r3 de volta
+; salva a troca
+st r3 r0
+st r2 r1
 
-not r3, r0
+; subtrai 1 do ponteiro Pfinal e soma 1 do ponteiro Pinicio
+data r0 0x01
 
-and r0,R1
+add r0 r3
+data r1 0xff
 
-or  r2,r1
+add r1 r2
 
-xor  r2,r1
-
-Add r2,r0
-
-
-
-ld r0,r1
-
-st r3,r1
-
-
-
-;comentario 3
-
-clf     
-
-
-
-cmp r1,r2
-
-
-
-jmpr r3
-
-jmp  0xf0
-
-
-
-jc 0xb0
-
-ja 0xb0
-
- je 0b00001111
-
-jz 0xb0
-
-jca 0xb0
-
-jce 0xb0
-
-jcz 0xb0
-
-jcae 0xb0
-
-jcaz 0xb0
-
-jcez 0xb0
-
-jcaez 0xb0
-
-jae 0x02
-
-jaz 0x02
-
-jaez 0x02
-
-jez 0x33
-
-
-
-; I/O instructions
-
-in data,r0
-
-IN addr,r1
-
-out data,r2
-
-out addr,r3 
+jmp 0x0f; repete
