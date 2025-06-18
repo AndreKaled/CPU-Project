@@ -23,31 +23,17 @@ jmp 0x12 ; loop de fim do programa
 
 ; trocas do vetor
 
-ld r3 r0 ; carrega x em r0
-ld r2 r1 ; carrega y em r1
-st r2 r3 ; guarda ponteiro Pinicio no final (onde vai ter a troca)
-data r3 0x00 ; limpa para tmp
+ld r3 r0 ; carrega x em r0 (inicio)
+ld r2 r1 ; carrega y em r1 (fim)
+st r3 r1 ; salva y em r3 (inicio)
+st r2 r0 ; salva x em r2 (fim)
 
-; troca r0 com r1
-add r0 r3 
-data r0 0x00
+data r0 0x01 ; 1 para somar no ponteiro inicio
 
-add r1 r0
-data r1 0x00
+data r1 0xff ; -1 para tirar do ponteiro fim
 
-add r3 r1
-
-ld r2 r3 ; carrega ponteiro Pinicio em r3 de volta
-; salva a troca
-st r3 r0
-st r2 r1
-
-; subtrai 1 do ponteiro Pfinal e soma 1 do ponteiro Pinicio
-data r0 0x01
-
+clf
 add r0 r3
-data r1 0xff
-
+clf
 add r1 r2
-
 jmp 0x0f; repete
