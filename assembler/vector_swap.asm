@@ -3,7 +3,7 @@ data r0 1
 
 data r1 1 
 
-data r2 0x30 ; controla a memoria (posicao do vetor), marca o fim do vetor
+data r2 0xf9 ; controla a memoria (posicao do vetor), marca o fim do vetor
 
 ; guarda ate acabar as instrucoes abaixo
 add r2 r3 ; R3 marca o inicio do vetor
