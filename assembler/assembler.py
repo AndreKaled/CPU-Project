@@ -51,14 +51,14 @@ def init():
             print("ERRO: Há argumentos faltando! Use: python3 montador.py <codigo.asm> <saida.txt>")
             exit(1)
         if len(sys.argv) > 3:
-            print("ERRO: Há argumentos demais! Use: python3 montador.py <codigo.asm> <saida.txt>")
+            print("ERRO: Há argumentos demais! Use: python3 montador.py <codigo.asm> <saida.m>")
             exit(1)
-        if os.path.splitext(sys.argv[1])[1][1:] != "asm" or os.path.splitext(sys.argv[2])[1][1:] != "txt":
+        if os.path.splitext(sys.argv[1])[1][1:] != "asm" or os.path.splitext(sys.argv[2])[1][1:] != "m":
             print("ERRO: Extensões inválidas dos argumentos. ")
             if os.path.splitext(sys.argv[1])[1][1:] != "asm":
                 print(f"Você não queria dizer {os.path.splitext(sys.argv[1])[0]}.asm?")
-            if os.path.splitext(sys.argv[2])[1][1:] != "txt":
-                print(f"Você não queria dizer {os.path.splitext(sys.argv[2])[0]}.txt?")
+            if os.path.splitext(sys.argv[2])[1][1:] != "m":
+                print(f"Você não queria dizer {os.path.splitext(sys.argv[2])[0]}.m?")
             exit(1)
         # abre os arquivos e inicia a escrita padrão
         input = open(sys.argv[1], "r") 
