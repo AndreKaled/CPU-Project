@@ -243,7 +243,9 @@ def geraByteCode(instrucao, ram, pos):
     # modifica a "RAM"
     ram[pos] = byte1
     pos = pos + 1
-    if byte2 or (instrucao.comando.startswith("J") and instrucao.comando != "JMPR"):
+    if byte2 or (instrucao.comando.startswith("J") and 
+                 instrucao.comando != "JMPR" or 
+                 instrucao.comando == "DATA"):
         ram[pos] = byte2
         pos = pos + 1
     return pos

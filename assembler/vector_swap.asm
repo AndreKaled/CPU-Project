@@ -1,32 +1,29 @@
-; guarda dados no vetor
-data r0 1
+data r0 7 ; guarda dados no vetor (este é n de vet[1..n])
 
-data r1 1 
+data r1 0xff ; decremento
 
-data r2 0xf9 ; controla a memoria (posicao do vetor), marca o fim do vetor
+data r2 0xff ; controla a memoria (vai até o inicio do vetor)
 
-; guarda ate acabar as instrucoes abaixo
-add r2 r3 ; R3 marca o inicio do vetor
-st r2 r0 ; guarda 1
-add r1 r0
-add r1 r2
-st r2 r0 ; guarda 2
-add r1 r0
-add r1 r2
-st r2 r0 ; guarda 3
-add r1 r0
-add r1 r2
-st r2 r0 ; guarda 4
-add r1 r0
-add r1 r2
-st r2 r0 ; guarda 5
-add r1 r0
-add r1 r2
-st r2 r0 ; guarda 6
-add r1 r0
-add r1 r2
-st r2 r0 ; guarda 7
+data r3 0x00 ; para comparar qnd chegar no fim da insercao
 
+st r2 r0 ; loop de insercao
+add r1 r0
+clf
+add r1 r2
+clf
+cmp r0 r0
+jz 0x12
+
+jmp 0x08
+
+data r3 0x00
+
+add r2 r3 ; r3 é o ponteiro pro inicio
+data r2 0xff ; r2 é o ponteiro pro final
+
+data r1 0x01
+
+add r1 r3 ; para estar na posicao certa
 clf
 cmp r2 r3
 ja 0x20 ; aqui tem que comecar a trocar
@@ -34,7 +31,6 @@ ja 0x20 ; aqui tem que comecar a trocar
 jmp 0x1e ; loop de fim do programa
 
 ; trocas do vetor
-
 ld r3 r0 ; carrega x em r0 (inicio)
 ld r2 r1 ; carrega y em r1 (fim)
 st r3 r1 ; salva y em r3 (inicio)
