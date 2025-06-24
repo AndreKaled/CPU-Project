@@ -3,6 +3,22 @@ Aluno: [André Kaled Duarte Coutinho Andrade]
 Matricula: [22450837]
 """
 
+
+"""
+HALT -> Loop (JMP Addr), tem que calcular addr (usar pos da ram?) === 
+MOVE Ra Rb -> limpar Rb e transferir Ra para Rb, Ra permanece com lixo (valor anterior) usar XOR Rb Ra, XOR Ra Rb ===
+CLR Ra -> clear Ra, usar XOR Ra Ra === OK
+Label -> se resume a função, nos jmps tem que traduzir o label para o endereço de onde está declarado o label (ou funcao) ===
+ex
+Main: blabla
+blabla
+jmp fim
+fim:blabla
+blabla
+jaez batata
+batata: ...
+ label pode ser tudo igual (caracteres)
+"""
 import sys
 import os
 # constantes
@@ -38,6 +54,12 @@ comandos = {"LD"  : 0x00, "ST"  : 0x10,
             "AND" : 0xC0, "OR"  : 0xD0, 
             "XOR" : 0xE0, "CMP" : 0xF0,
 }
+
+comandos_conjuntos = {
+    "MOVE": 0, "CLR": 1,
+    "HALF": 2,
+}
+
 def init():
     """ Inicializa os acessos de arquivos passados nos argumentos
     Para o segundo argumento, quando nao existir o arquivo, será criado pelo programa com o mesmo nome dado no argumento
@@ -109,9 +131,12 @@ def buscaComando(nome=""):
     """ recebe o nome da instrucao e busca no dicionario se existe um comando com o mesmo nome """
     if (nome.startswith("JC") or nome.startswith("JA") or 
     nome.startswith("JE") or nome.startswith("JZ")):
-        return 0x50
+        return 0x50 , None
     if nome in comandos:
-        return comandos[nome]
+        return comandos[nome], None
+    # indica quando é uma instrução facilitadora
+    elif nome in comandos_conjuntos:
+        return nome, 1
     else:
         print(f"ERRO: Comando {nome} inválido!")
         exit(1)
@@ -207,47 +232,68 @@ def geraByteCode(instrucao, ram, pos):
     """ converte a instrucao em byte, faz a manipulação bit a 
     bit conforme os registradores ou addr
     """
-    byte1 = buscaComando(instrucao.comando)
+    byte1, flag = buscaComando(instrucao.comando)
+    cont = 1
+    if flag:
+        if byte1 == "CLR":
+            instrucao.comando = "XOR"
+            byte1 = comandos[instrucao.comando]
+            instrucao.op2 = instrucao.op1
+            flag = None
+        elif byte1 == "MOVE":
+            instrucao.comando = "XOR"
+            byte1 = comandos[instrucao.comando]
+            aux = instrucao.op1
+            instrucao.op1 = instrucao.op2
+            instrucao.op2 = aux
+            cont = 2
+
     byte2 = 0x00
-    if (instrucao.comando == "LD" or instrucao.comando == "ST" or instrucao.comando == "ADD" or instrucao.comando == "SHR" or instrucao.comando == "SHL" or 
-        instrucao.comando == "NOT" or instrucao.comando == "AND" or instrucao.comando == "OR" or instrucao.comando == "XOR" or instrucao.comando == "CMP"):
-        instrucao.op1 = trataDado(instrucao.op1)
-        instrucao.op2 = trataDado(instrucao.op2)
-        byte1 |= (regToNum(instrucao.op1) << 2) | regToNum(instrucao.op2)
-    elif instrucao.comando == "DATA": # data usa 2 bytes
-        instrucao.op1 = trataDado(instrucao.op1)
-        instrucao.op2 = trataDado(instrucao.op2)
-        byte1 |= regToNum(instrucao.op1)
-        byte2 = instrucao.op2
-    elif instrucao.comando == "IN" or instrucao.comando == "OUT":
-        instrucao.op1 = trataDado(instrucao.op1)
-        instrucao.op2 = trataDado(instrucao.op2)
-        tipo = instrucao.op1
-        reg = instrucao.op2
-        in_out = 1 if instrucao.comando == "OUT" else 0
-        if tipo == "ADDR":
-            byte1 |= (in_out << 3) | (1 << 2) | regToNum(reg)
-        elif tipo == "DATA":
-            byte1 |= (in_out << 3) | (0 << 2) | regToNum(reg)
-        else:
-            print("Operando inválido para IN/OUT")
-            exit(1)
-    elif instrucao.comando == "JMPR":
-        byte1 |= regToNum(instrucao.op1)
-    elif instrucao.comando.startswith("J"): # para jumps 
-        instrucao.op1 = trataDadoJMP(instrucao.op1)
-        if instrucao.comando != "JMP" and instrucao.comando != "JMPR":
-            byte1|= flags(instrucao.comando)
-        byte2 = instrucao.op1
-        
-    # modifica a "RAM"
-    ram[pos] = byte1
-    pos = pos + 1
-    if byte2 or (instrucao.comando.startswith("J") and 
-                 instrucao.comando != "JMPR" or 
-                 instrucao.comando == "DATA"):
-        ram[pos] = byte2
+    while(cont):
+        if (instrucao.comando == "LD" or instrucao.comando == "ST" or instrucao.comando == "ADD" or instrucao.comando == "SHR" or instrucao.comando == "SHL" or 
+            instrucao.comando == "NOT" or instrucao.comando == "AND" or instrucao.comando == "OR" or instrucao.comando == "XOR" or instrucao.comando == "CMP"):
+            instrucao.op1 = trataDado(instrucao.op1)
+            instrucao.op2 = trataDado(instrucao.op2)
+            byte1 |= (regToNum(instrucao.op1) << 2) | regToNum(instrucao.op2)
+        elif instrucao.comando == "DATA": # data usa 2 bytes
+            instrucao.op1 = trataDado(instrucao.op1)
+            instrucao.op2 = trataDado(instrucao.op2)
+            byte1 |= regToNum(instrucao.op1)
+            byte2 = instrucao.op2
+        elif instrucao.comando == "IN" or instrucao.comando == "OUT":
+            instrucao.op1 = trataDado(instrucao.op1)
+            instrucao.op2 = trataDado(instrucao.op2)
+            tipo = instrucao.op1
+            reg = instrucao.op2
+            in_out = 1 if instrucao.comando == "OUT" else 0
+            if tipo == "ADDR":
+                byte1 |= (in_out << 3) | (1 << 2) | regToNum(reg)
+            elif tipo == "DATA":
+                byte1 |= (in_out << 3) | (0 << 2) | regToNum(reg)
+            else:
+                print("Operando inválido para IN/OUT")
+                exit(1)
+        elif instrucao.comando == "JMPR":
+            byte1 |= regToNum(instrucao.op1)
+        elif instrucao.comando.startswith("J"): # para jumps 
+            instrucao.op1 = trataDadoJMP(instrucao.op1)
+            if instrucao.comando != "JMP" and instrucao.comando != "JMPR":
+                byte1|= flags(instrucao.comando)
+            byte2 = instrucao.op1
+            
+        # modifica a "RAM"
+        ram[pos] = byte1
         pos = pos + 1
+        if byte2 or (instrucao.comando.startswith("J") and 
+                    instrucao.comando != "JMPR" or 
+                    instrucao.comando == "DATA"):
+            ram[pos] = byte2
+            pos = pos + 1
+        cont -= 1
+        byte1 = comandos[instrucao.comando]
+        aux = instrucao.op1
+        instrucao.op1 = instrucao.op2
+        instrucao.op2 = aux
     return pos
 
 # funcao principal
