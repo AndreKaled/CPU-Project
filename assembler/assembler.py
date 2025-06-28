@@ -4,7 +4,7 @@ Matricula: [22450837]
 """
 """
 HALT -> Loop (JMP Addr), tem que calcular addr (usar pos da ram?) === 
-MOVE Ra Rb -> limpar Rb e transferir Ra para Rb, Ra permanece com lixo (valor anterior) usar XOR Rb Ra, XOR Ra Rb ===
+MOVE Ra Rb -> limpar Rb e transferir Ra para Rb, Ra permanece com lixo (valor anterior) usar XOR Rb Ra, XOR Ra Rb === OK
 CLR Ra -> clear Ra, usar XOR Ra Ra === OK
 Label -> se resume a função, nos jmps tem que traduzir o label para o endereço de onde está declarado o label (ou funcao) ===
 Main: blabla
@@ -37,6 +37,7 @@ class Instrucao:
 RAM_SIZE = 256
 ram = [0x00] * RAM_SIZE
 
+labels = {}
 flags_jcaez = {"C": 0x8, "A":0x4, "E": 0x2, "Z":0x1}
 
 # dicionario para ter a instrucao hexadecimal como base, modificando com registradores ou addr
@@ -52,7 +53,7 @@ comandos_logico_aritmeticos = {
 
 comandos_facilitadores = {
     "MOVE": 0, "CLR": 1,
-    "HALF": 2,
+    "HALT": 2,
 }
 
 comandos_data = {"DATA": 0x20,}
@@ -230,7 +231,7 @@ def flags(jcaez):
     return hex
 
 def expandir_pseudo_instrucao(instrucao_obj_original, flag_facilitador):
-    if flag_facilitador: # flag indicadora de que é um comando facilitador (MOVE, CLR, HALF)
+    if flag_facilitador: # flag indicadora de que é um comando facilitador (MOVE, CLR, HALT)
         if instrucao_obj_original.comando == "CLR":
             # CLR Ra -> XOR Ra Ra
             return [Instrucao("XOR", comandos_logico_aritmeticos["XOR"], instrucao_obj_original.op1, instrucao_obj_original.op1)]
@@ -243,7 +244,7 @@ def expandir_pseudo_instrucao(instrucao_obj_original, flag_facilitador):
                 Instrucao("XOR", comandos_logico_aritmeticos["XOR"], instrucao_obj_original.op2, instrucao_obj_original.op1), 
                 Instrucao("XOR", comandos_logico_aritmeticos["XOR"], instrucao_obj_original.op1, instrucao_obj_original.op2)]
         
-        elif instrucao_obj_original.comando == "HALF":
+        elif instrucao_obj_original.comando == "HALT":
             # HALT como JMP para si mesmo.
             return [Instrucao("HALT", 0xEE, None, None)]
             
@@ -273,7 +274,7 @@ def geraByteCode(instrucao_obj, ram, pos):
         byte1 |= reg_num
     elif instrucao_obj.comando == "CLF":
         byte1 = instrucao_obj.bytecode
-    elif instrucao_obj.comando == "HALF":
+    elif instrucao_obj.comando == "HALT":
         byte1 = instrucao_obj.bytecode
     # Lógica para JMP e Jumps Condicionais (JCAEZ)
     elif instrucao_obj.comando.startswith("J") and instrucao_obj.comando != "JMPR":
@@ -292,6 +293,15 @@ def geraByteCode(instrucao_obj, ram, pos):
         pos += 1
     return pos
 
+def tamanho_instrucao(instrucao):
+    """Retorna o tamanho de bytes de uma instrucao (expandida ou nao)
+    Usado na primeira passagem pra calcular os endereços dos labels"""
+    if (instrucao.comando in comandos_data or
+        instrucao.comando == "HALT" or
+        (instrucao.comando.startswith("J") and instrucao.comando != "JMPR")):
+        return 2
+    return 1
+
 # funcao principal
 def main():
     """ função principal do programa, faz a montagem """
@@ -299,35 +309,78 @@ def main():
     input_file_content = input_file.readlines()
     input_file.close()
 
-    # --- PRIMEIRA PASSAGEM (para futuras funcionalidades como Labels) ---
-    todas_instrucoes_expandidas = []
+    rastreio_pos = 0
+
+    # --- PRIMEIRA PASSAGEM ---
     for linha_str_original in input_file_content:
         linha_str = linha_str_original.strip()
         if not linha_str or linha_str.startswith(';'): # Ignora linhas vazias ou comentários
             continue
         
-        # ignorando labels por enquanto, mas mantendo a limpeza da linha
+        # ve se tem label
         if ":" in linha_str:
-            linha_str = linha_str.split(":", 1)[1].strip()
-            if not linha_str: # se era só um label na linha, ignora e vai pra próxima
+            partes_label = linha_str_original.split(":", 1)
+            nome_label = partes_label[0].strip()
+            # valida label
+            if not nome_label:
+                print(f"ERRO: label inválido em {linha_str_original}")
+                exit(1)
+            if nome_label in labels:
+                print(f"ERRO: declaração de label {nome_label} duplicada!")
+                exit(1)
+
+            # guarda no dicionario
+            nome_label = nome_label.upper()
+            labels[nome_label] = rastreio_pos
+            linha_str = partes_label[1].strip()
+            if not linha_str:
                 continue
 
-        resultado_ler_comando = lerComando(linha_str)
-        if resultado_ler_comando:
-            instrucao_obj_lida, flag_facilitador = resultado_ler_comando
-            
-            instrucoes_reais = expandir_pseudo_instrucao(instrucao_obj_lida, flag_facilitador)
-            for instrucao in instrucoes_reais:
-                todas_instrucoes_expandidas.append(instrucao)
+        # se tiver instrucao
+        if linha_str:
+            resultado_ler_comando = lerComando(linha_str)
+            if resultado_ler_comando:
+                instrucao_obj_lida, flag_facilitador = resultado_ler_comando
+                instrucoes_reais = expandir_pseudo_instrucao(instrucao_obj_lida, flag_facilitador)
+                for instrucao in instrucoes_reais:
+                    rastreio_pos += tamanho_instrucao(instrucao)
+                if rastreio_pos > RAM_SIZE:
+                    print(f"ERRO: Código excedeu o tamanho máximo da RAM ({RAM_SIZE} bytes)!")
+                    exit(1)
+            else:
+                continue
 
-    # --- SEGUNDA PASSAGEM (Gerar bytecode para as instruções já expandidas) ---
+    # --- SEGUNDA PASSAGEM (gera bytecode para as instruções já expandidas) ---
     pos = 0
-    for inst_real in todas_instrucoes_expandidas:
-        # Agora, geraByteCode só precisa de um objeto Instrucao "real"
-        pos = geraByteCode(inst_real, ram, pos) # chama a versão final de geraByteCode
-        if pos > RAM_SIZE:
-            print(f"ERRO: Código excedeu o tamanho máximo da RAM ({RAM_SIZE} bytes)!")
-            exit(1)
+    for linha_str in input_file_content:
+        linha_str = linha_str.strip()
+        if not linha_str or linha_str.startswith(";"):
+            continue
+
+        tmp_linha_str = linha_str
+        if ":" in tmp_linha_str:
+            tmp_linha_str = tmp_linha_str.split(":",1)[1].strip()
+            if not tmp_linha_str:
+                continue
+        if tmp_linha_str:
+            resultado_ler_comando = lerComando(tmp_linha_str)
+            if resultado_ler_comando:
+                instrucao_obj, flag_facilitador = resultado_ler_comando
+                instrucoes_expandidas = expandir_pseudo_instrucao(instrucao_obj, flag_facilitador)
+
+                for instrucao in instrucoes_expandidas:
+                    if (instrucao.comando.startswith("J") and
+                        instrucao.comando != "JMPR" and
+                        instrucao.op1 and instrucao.op1 in labels):
+                        instrucao.op1 = str(labels[instrucao.op1])
+                    elif instrucao.comando == "HALT":
+                        instrucao.comando = "JMP"
+                        instrucao.bytecode = comandos_jumpers["JMP"]
+                        instrucao.op1 = str(pos)
+                    pos = geraByteCode(instrucao,ram,pos)
+                    if pos > RAM_SIZE:
+                        print(f"ERRO: Código excedeu o tamanho máximo da RAM ({RAM_SIZE} bytes)!")
+                        exit(1)
     
     salva(ram, pos, RAM_SIZE, output_file)
     print(f"Processado com sucesso, arquivo salvo em {sys.argv[2]}")
