@@ -2,17 +2,6 @@
 Aluno: [André Kaled Duarte Coutinho Andrade]
 Matricula: [22450837]
 """
-"""
-HALT -> Loop (JMP Addr), tem que calcular addr (usar pos da ram?) === 
-MOVE Ra Rb -> limpar Rb e transferir Ra para Rb, Ra permanece com lixo (valor anterior) usar XOR Rb Ra, XOR Ra Rb === OK
-CLR Ra -> clear Ra, usar XOR Ra Ra === OK
-Label -> se resume a função, nos jmps tem que traduzir o label para o endereço de onde está declarado o label (ou funcao) ===
-Main: blabla
-blabla
-jmp fim
-fim:blabla
- label pode ser tudo igual (caracteres)
-"""
 import sys
 import os
 # =============================
@@ -37,7 +26,7 @@ class Instrucao:
 
 # simulador da ram
 RAM_SIZE = 256
-ram = [0x00] * RAM_SIZE
+ram = []
 flags_jcaez = {"C": 0x8, "A":0x4, "E": 0x2, "Z":0x1}
 
 # dicionario para ter a instrucao hexadecimal como base, modificando com registradores ou addr
@@ -122,20 +111,13 @@ def lerComando(linha):
     op2 = partes[2] if len(partes) > 2 else None
     return Instrucao(cmd, opcode, op1, op2), flag
 
-def salva(dados, pos, tam, output_file):
+def salva(dados, output_file):
     """ Passa todos os dados salvos na "RAM" recebida para o arquivo de saída. 
         Quando a "RAM" está incompleta, a função preenche o vazio com 0x00
     """
     vet = dados.copy()
-    for i in range(pos, tam):
-        vet.append(0x00)
-
-    for i in range(tam):
-        output_file.write(f"{vet[i]:02x}")
-        if (i+1) % 16 == 0:
-            output_file.write("\n")
-        else:
-            output_file.write(f" ")
+    for dado in vet:
+        output_file.write(f"{dado:02x}\n")
 
 def regToNum(reg=""):
     """ recebe como argumento um registrador e o converte em número """
@@ -241,14 +223,13 @@ def geraByteCode(instrucao_obj, ram, pos):
         exit(1)
 
     # escreve o(s) byte(s) na RAM
-    ram[pos] = byte1
+    ram.append(byte1)
     pos += 1
 
     # verifica se um segundo byte é necessário (DATA, JMP, JCAEZ)
     if instrucao_obj.comando in comandos_data or (instrucao_obj.comando.startswith("J") and instrucao_obj.comando != "JMPR"):
-        ram[pos] = byte2
+        ram.append(byte2)
         pos += 1
-    return pos
 
 def tamanho_instrucao(instrucao):
     """Retorna o tamanho de bytes de uma instrucao (expandida ou nao)
@@ -333,11 +314,11 @@ def segundaPassagem(input_file_content, labels):
                         instrucao.comando = "JMP"
                         instrucao.bytecode = comandos_jumpers["JMP"]
                         instrucao.op1 = str(pos)
-                    pos = geraByteCode(instrucao,ram,pos)
-                    if pos > RAM_SIZE:
+                    geraByteCode(instrucao,ram,pos)
+                    pos+= tamanho_instrucao(instrucao)
+                    if len(ram) > RAM_SIZE:
                         print(f"ERRO: Código excedeu o tamanho máximo da RAM ({RAM_SIZE} bytes)!")
                         exit(1)
-    return pos
 
 # funcao principal
 def main():
@@ -347,9 +328,9 @@ def main():
     input_file.close()
 
     labels = primeiraPassagem(input_file_content)
-    pos = segundaPassagem(input_file_content, labels)
+    segundaPassagem(input_file_content, labels)
     
-    salva(ram, pos, RAM_SIZE, output_file)
+    salva(ram, output_file)
     print(f"Processado com sucesso, arquivo salvo em {sys.argv[2]}")
     output_file.close()
     exit(0)
