@@ -1,2 +1,4 @@
-ld r2 r1
-st r2 r1
+data r0 0xff
+data r1 0xaa
+move r0 r1
+jmp 0x06

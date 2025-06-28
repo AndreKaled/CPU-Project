@@ -2,21 +2,15 @@
 Aluno: [André Kaled Duarte Coutinho Andrade]
 Matricula: [22450837]
 """
-
-
 """
 HALT -> Loop (JMP Addr), tem que calcular addr (usar pos da ram?) === 
 MOVE Ra Rb -> limpar Rb e transferir Ra para Rb, Ra permanece com lixo (valor anterior) usar XOR Rb Ra, XOR Ra Rb ===
 CLR Ra -> clear Ra, usar XOR Ra Ra === OK
 Label -> se resume a função, nos jmps tem que traduzir o label para o endereço de onde está declarado o label (ou funcao) ===
-ex
 Main: blabla
 blabla
 jmp fim
 fim:blabla
-blabla
-jaez batata
-batata: ...
  label pode ser tudo igual (caracteres)
 """
 import sys
@@ -33,8 +27,9 @@ MAX_MEMORIA = (1 << TOTAL_BITS)           # maior hexadecimal armazenavel na mem
 
 # classe de instrucao (era uma struct), para traduzir a gramatica regular do assembly
 class Instrucao:
-    def __init__(self, comando="", op1="", op2=""):
+    def __init__(self, comando="", bytecode="", op1="", op2=""):
         self.comando = comando
+        self.bytecode = bytecode
         self.op1 = op1
         self.op2 = op2
 
@@ -45,20 +40,23 @@ ram = [0x00] * RAM_SIZE
 flags_jcaez = {"C": 0x8, "A":0x4, "E": 0x2, "Z":0x1}
 
 # dicionario para ter a instrucao hexadecimal como base, modificando com registradores ou addr
-comandos = {"LD"  : 0x00, "ST"  : 0x10,
-            "DATA": 0x20, "JMPR": 0x30,
-            "JMP" : 0x40, "CLF" : 0x60,
-            "IN"  : 0x70, "OUT" : 0x78,
-            "ADD" : 0x80, "SHR" : 0x90, 
-            "SHL" : 0xA0, "NOT" : 0xB0,
-            "AND" : 0xC0, "OR"  : 0xD0, 
-            "XOR" : 0xE0, "CMP" : 0xF0,
+comandos_clear = {"CLF" : 0x60}
+comandos_IO = {"IN"  : 0x70, "OUT" : 0x78,}
+comandos_logico_aritmeticos = {
+    "LD"  : 0x00, "ST"  : 0x10,
+    "ADD" : 0x80, "SHR" : 0x90, 
+    "SHL" : 0xA0, "NOT" : 0xB0,
+    "AND" : 0xC0, "OR"  : 0xD0, 
+    "XOR" : 0xE0, "CMP" : 0xF0,
 }
 
-comandos_conjuntos = {
+comandos_facilitadores = {
     "MOVE": 0, "CLR": 1,
     "HALF": 2,
 }
+
+comandos_data = {"DATA": 0x20,}
+comandos_jumpers = {"JMPR": 0x30, "JMP" : 0x40}
 
 def init():
     """ Inicializa os acessos de arquivos passados nos argumentos
@@ -96,12 +94,32 @@ def lerComando(linha):
     linha = linha.upper().split(";")[0].strip()
     linha = linha.replace(",", " ")
     partes = linha.split()
+    flag = None
     if not partes:
         return None
+    if partes[0] in comandos_logico_aritmeticos:
+        opcode = comandos_logico_aritmeticos[partes[0]]
+    elif partes[0] in comandos_data:
+        opcode = comandos_data[partes[0]]
+    elif partes[0] in comandos_jumpers:
+        opcode = comandos_jumpers[partes[0]]
+    elif partes[0] in comandos_IO:
+        opcode = comandos_IO[partes[0]]
+    elif partes[0] in comandos_clear:
+        opcode = comandos_clear[partes[0]]
+    elif partes[0] in comandos_facilitadores:
+        opcode = comandos_facilitadores[partes[0]]
+        flag = 1
+    elif (partes[0].startswith("JC") or partes[0].startswith("JA") or 
+    partes[0].startswith("JE") or partes[0].startswith("JZ")):
+        opcode = 0x50 | flags(partes[0])
+    else:
+        print(f"ERRO: Comando {linha} inválido!")
+        exit(1)
     cmd = partes[0]
     op1 = partes[1] if len(partes) > 1 else None
     op2 = partes[2] if len(partes) > 2 else None
-    return Instrucao(cmd, op1, op2)
+    return Instrucao(cmd, opcode, op1, op2), flag
 
 def salva(dados, pos, tam, output_file):
     """ Passa todos os dados salvos na "RAM" recebida para o arquivo de saída. 
@@ -118,28 +136,12 @@ def salva(dados, pos, tam, output_file):
         else:
             output_file.write(f" ")
 
-
 def regToNum(reg=""):
     """ recebe como argumento um registrador e o converte em número """
     if (len(reg) != 2) or (reg[0] != 'R') or not reg[1].isdigit() or (int(reg[1]) < 0) or(int(reg[1]) > 3):
         print("ERRO: registrador inválido: ", reg)
         exit(1)
     return int(reg[1])
-
-
-def buscaComando(nome=""):
-    """ recebe o nome da instrucao e busca no dicionario se existe um comando com o mesmo nome """
-    if (nome.startswith("JC") or nome.startswith("JA") or 
-    nome.startswith("JE") or nome.startswith("JZ")):
-        return 0x50 , None
-    if nome in comandos:
-        return comandos[nome], None
-    # indica quando é uma instrução facilitadora
-    elif nome in comandos_conjuntos:
-        return nome, 1
-    else:
-        print(f"ERRO: Comando {nome} inválido!")
-        exit(1)
 
 def trataDado(op):
     """ converte um argumento (bin, hex, dec) em hexadecimal, isso quando não
@@ -216,7 +218,6 @@ def trataDadoJMP(op):
         exit(1)
     return op
 
-
 def flags(jcaez):
     """ aciona as flags do jumper """
     jcaez = jcaez[1:]
@@ -228,89 +229,109 @@ def flags(jcaez):
         hex += flags_jcaez[let]
     return hex
 
-def geraByteCode(instrucao, ram, pos):
-    """ converte a instrucao em byte, faz a manipulação bit a 
-    bit conforme os registradores ou addr
-    """
-    byte1, flag = buscaComando(instrucao.comando)
-    cont = 1
-    if flag:
-        if byte1 == "CLR":
-            instrucao.comando = "XOR"
-            byte1 = comandos[instrucao.comando]
-            instrucao.op2 = instrucao.op1
-            flag = None
-        elif byte1 == "MOVE":
-            instrucao.comando = "XOR"
-            byte1 = comandos[instrucao.comando]
-            aux = instrucao.op1
-            instrucao.op1 = instrucao.op2
-            instrucao.op2 = aux
-            cont = 2
-
-    byte2 = 0x00
-    while(cont):
-        if (instrucao.comando == "LD" or instrucao.comando == "ST" or instrucao.comando == "ADD" or instrucao.comando == "SHR" or instrucao.comando == "SHL" or 
-            instrucao.comando == "NOT" or instrucao.comando == "AND" or instrucao.comando == "OR" or instrucao.comando == "XOR" or instrucao.comando == "CMP"):
-            instrucao.op1 = trataDado(instrucao.op1)
-            instrucao.op2 = trataDado(instrucao.op2)
-            byte1 |= (regToNum(instrucao.op1) << 2) | regToNum(instrucao.op2)
-        elif instrucao.comando == "DATA": # data usa 2 bytes
-            instrucao.op1 = trataDado(instrucao.op1)
-            instrucao.op2 = trataDado(instrucao.op2)
-            byte1 |= regToNum(instrucao.op1)
-            byte2 = instrucao.op2
-        elif instrucao.comando == "IN" or instrucao.comando == "OUT":
-            instrucao.op1 = trataDado(instrucao.op1)
-            instrucao.op2 = trataDado(instrucao.op2)
-            tipo = instrucao.op1
-            reg = instrucao.op2
-            in_out = 1 if instrucao.comando == "OUT" else 0
-            if tipo == "ADDR":
-                byte1 |= (in_out << 3) | (1 << 2) | regToNum(reg)
-            elif tipo == "DATA":
-                byte1 |= (in_out << 3) | (0 << 2) | regToNum(reg)
-            else:
-                print("Operando inválido para IN/OUT")
-                exit(1)
-        elif instrucao.comando == "JMPR":
-            byte1 |= regToNum(instrucao.op1)
-        elif instrucao.comando.startswith("J"): # para jumps 
-            instrucao.op1 = trataDadoJMP(instrucao.op1)
-            if instrucao.comando != "JMP" and instrucao.comando != "JMPR":
-                byte1|= flags(instrucao.comando)
-            byte2 = instrucao.op1
+def expandir_pseudo_instrucao(instrucao_obj_original, flag_facilitador):
+    if flag_facilitador: # flag indicadora de que é um comando facilitador (MOVE, CLR, HALF)
+        if instrucao_obj_original.comando == "CLR":
+            # CLR Ra -> XOR Ra Ra
+            return [Instrucao("XOR", comandos_logico_aritmeticos["XOR"], instrucao_obj_original.op1, instrucao_obj_original.op1)]
+        
+        elif instrucao_obj_original.comando == "MOVE":
+            # MOVE Ra Rb -> XOR Rb, Ra; XOR Ra, Rb
+            # instrucao_obj_original.op1 é a fonte (Ra)
+            # instrucao_obj_original.op2 é o destino (Rb)
+            return [
+                Instrucao("XOR", comandos_logico_aritmeticos["XOR"], instrucao_obj_original.op2, instrucao_obj_original.op1), 
+                Instrucao("XOR", comandos_logico_aritmeticos["XOR"], instrucao_obj_original.op1, instrucao_obj_original.op2)]
+        
+        elif instrucao_obj_original.comando == "HALF":
+            # HALT como JMP para si mesmo.
+            return [Instrucao("HALT", 0xEE, None, None)]
             
-        # modifica a "RAM"
-        ram[pos] = byte1
-        pos = pos + 1
-        if byte2 or (instrucao.comando.startswith("J") and 
-                    instrucao.comando != "JMPR" or 
-                    instrucao.comando == "DATA"):
-            ram[pos] = byte2
-            pos = pos + 1
-        cont -= 1
-        byte1 = comandos[instrucao.comando]
-        aux = instrucao.op1
-        instrucao.op1 = instrucao.op2
-        instrucao.op2 = aux
+    # todos os outros comandos (LD, ADD, JMP, etc.), retorna a instrução original em uma lista.
+    return [instrucao_obj_original]
+
+def geraByteCode(instrucao_obj, ram, pos):
+    """ Converte uma instrucao (já expandida) em bytecode e a armazena na RAM. """
+    byte1 = instrucao_obj.bytecode
+    byte2 = 0x00
+    if instrucao_obj.comando in comandos_logico_aritmeticos:
+        reg1_num = regToNum(instrucao_obj.op1)
+        reg2_num = regToNum(instrucao_obj.op2)
+        byte1 |= (reg1_num << 2) | reg2_num
+    elif instrucao_obj.comando in comandos_data:
+        reg_num = regToNum(instrucao_obj.op1)
+        data_value = trataDado(instrucao_obj.op2)
+        byte1 |= reg_num
+        byte2 = data_value    
+    elif instrucao_obj.comando in comandos_IO:
+        tipo = instrucao_obj.op1
+        reg = instrucao_obj.op2
+        in_out_bit = 1 if instrucao_obj.comando == "OUT" else 0
+        byte1 |= (in_out_bit << 3) | ((1 if tipo == "ADDR" else 0) << 2) | regToNum(reg)
+    elif instrucao_obj.comando == "JMPR":
+        reg_num = regToNum(instrucao_obj.op1)
+        byte1 |= reg_num
+    elif instrucao_obj.comando == "CLF":
+        byte1 = instrucao_obj.bytecode
+    elif instrucao_obj.comando == "HALF":
+        byte1 = instrucao_obj.bytecode
+    # Lógica para JMP e Jumps Condicionais (JCAEZ)
+    elif instrucao_obj.comando.startswith("J") and instrucao_obj.comando != "JMPR":
+        byte2 = trataDadoJMP(instrucao_obj.op1) # instrucao_obj.op1 deve ser o endereço ou label (resolvido na 2a passagem)
+    else:
+        print(f"ERRO INTERNO: Comando '{instrucao_obj.comando}' não tratado na geração do bytecode final.")
+        exit(1)
+
+    # escreve o(s) byte(s) na RAM
+    ram[pos] = byte1
+    pos += 1
+
+    # verifica se um segundo byte é necessário (DATA, JMP, JCAEZ)
+    if instrucao_obj.comando in comandos_data or (instrucao_obj.comando.startswith("J") and instrucao_obj.comando != "JMPR"):
+        ram[pos] = byte2
+        pos += 1
     return pos
 
 # funcao principal
 def main():
     """ função principal do programa, faz a montagem """
     input_file, output_file = init()
+    input_file_content = input_file.readlines()
+    input_file.close()
+
+    # --- PRIMEIRA PASSAGEM (para futuras funcionalidades como Labels) ---
+    todas_instrucoes_expandidas = []
+    for linha_str_original in input_file_content:
+        linha_str = linha_str_original.strip()
+        if not linha_str or linha_str.startswith(';'): # Ignora linhas vazias ou comentários
+            continue
+        
+        # ignorando labels por enquanto, mas mantendo a limpeza da linha
+        if ":" in linha_str:
+            linha_str = linha_str.split(":", 1)[1].strip()
+            if not linha_str: # se era só um label na linha, ignora e vai pra próxima
+                continue
+
+        resultado_ler_comando = lerComando(linha_str)
+        if resultado_ler_comando:
+            instrucao_obj_lida, flag_facilitador = resultado_ler_comando
+            
+            instrucoes_reais = expandir_pseudo_instrucao(instrucao_obj_lida, flag_facilitador)
+            for instrucao in instrucoes_reais:
+                todas_instrucoes_expandidas.append(instrucao)
+
+    # --- SEGUNDA PASSAGEM (Gerar bytecode para as instruções já expandidas) ---
     pos = 0
-    for linha in input_file:
-        linha = linha.strip()
-        instrucao = lerComando(linha)
-        if instrucao:
-            pos = geraByteCode(instrucao, ram, pos)
+    for inst_real in todas_instrucoes_expandidas:
+        # Agora, geraByteCode só precisa de um objeto Instrucao "real"
+        pos = geraByteCode(inst_real, ram, pos) # chama a versão final de geraByteCode
+        if pos > RAM_SIZE:
+            print(f"ERRO: Código excedeu o tamanho máximo da RAM ({RAM_SIZE} bytes)!")
+            exit(1)
     
     salva(ram, pos, RAM_SIZE, output_file)
     print(f"Processado com sucesso, arquivo salvo em {sys.argv[2]}")
     output_file.close()
-    input_file.close()
     exit(0)
     
 main()
