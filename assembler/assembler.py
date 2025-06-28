@@ -15,7 +15,9 @@ fim:blabla
 """
 import sys
 import os
-# constantes
+# =============================
+#     CONSTANTES GLOBAIS       
+#==============================
 INIT_CODE = "v3.0 hex words plain\n"
 BYTE_SIZE = 1
 TOTAL_BITS = BYTE_SIZE * 8                # capacidade maxima de dado (considerando complemento de dois)
@@ -36,8 +38,6 @@ class Instrucao:
 # simulador da ram
 RAM_SIZE = 256
 ram = [0x00] * RAM_SIZE
-
-labels = {}
 flags_jcaez = {"C": 0x8, "A":0x4, "E": 0x2, "Z":0x1}
 
 # dicionario para ter a instrucao hexadecimal como base, modificando com registradores ou addr
@@ -144,80 +144,37 @@ def regToNum(reg=""):
         exit(1)
     return int(reg[1])
 
-def trataDado(op):
+def trataDado(op, permite_negativo=True):
     """ converte um argumento (bin, hex, dec) em hexadecimal, isso quando não
         for data, addr (para in/out) e registrador"""
-    if op != None and not op.startswith("R") and op not in {"DATA", "ADDR"}:
-        numeroInicial = None
-        if op.startswith("0X"):
-            numeroInicial = int(op, 16)
-            if numeroInicial > MASCARA:
-                print(f"ERRO: o hexadecimal {op} não cabe "
-                      f"em {TOTAL_BITS} bits (max:{hex(MASCARA)})")
-                exit(1)
-        elif op.startswith("0B"):
-            numeroInicial = int(op, 2)  
-            if numeroInicial > MASCARA:
-                print(f"ERRO: o binário {op} não cabe "
-                      f"em {TOTAL_BITS} bits (max:{bin(MASCARA)})")
-                exit(1)
-        else:
-            try:
-                numeroInicial = int(op) 
-                if numeroInicial < MIN_NEGATIVO or numeroInicial > MAX_POSITIVO:
-                    print(f"ERRO: o número {op} está fora do "
-                          f"intervalo [{MIN_NEGATIVO},{MAX_POSITIVO}]")
-                    exit(1)
-                if numeroInicial < 0:
-                    numeroInicial = COMPLEMENTO_DOIS + numeroInicial
-            except ValueError:
-                print(f"ERRO: valor {op} não é um número válido")
-                exit(1)
-        valorMascarado = numeroInicial & MASCARA
-        # ve se o bit de sinal está ligado e retorna em complemento de dois
-        if valorMascarado & (1 << (TOTAL_BITS -1)) != 0:
-            return (valorMascarado - COMPLEMENTO_DOIS) & MASCARA
-        # valor positivo
-        else:
-            return valorMascarado
     if not op:
-        print("ERRO: está faltando argumentos em uma instrução")
+        print("ERRO: está faltando argumentos")
         exit(1)
-    return op
-
-def trataDadoJMP(op):
-    """ converte argumento em hexadecimal, considerando apenas 
-     memória, sem complemento de dois """
-    if op != None and not op.startswith("R") and op not in {"DATA", "ADDR"}:
-        numeroInicial = None
+    if op.startswith("R") or op in {"DATA", "ADDR"}:
+        return op # nao trata registrador nem palavra chave
+    try:
         if op.startswith("0X"):
-            numeroInicial = int(op, 16)
-            if numeroInicial > MASCARA:
-                print(f"ERRO: o hexadecimal {op} não cabe "
-                      f"em {TOTAL_BITS} bits (max:{hex(MASCARA)})")
-                exit(1)
+            num = int(op, 16)
         elif op.startswith("0B"):
-            numeroInicial = int(op, 2)  
-            if numeroInicial > MASCARA:
-                print(f"ERRO: o binário {op} não cabe "
-                      f"em {TOTAL_BITS} bits (max:{bin(MASCARA)})")
-                exit(1)
+            num = int(op,2)
         else:
-            try:
-                numeroInicial = int(op) 
-                if numeroInicial < 0 or numeroInicial > MASCARA:
-                    print(f"ERRO: o número {op} está fora do "
-                          f"intervalo [0,{MASCARA}]")
-                    exit(1)
-            except ValueError:
-                print(f"ERRO: valor {op} não é um número válido")
+            num = int(op)
+        if not permite_negativo and num < 0:
+            print(f"ERRO: valor {op} fora do intervalo [0,{MASCARA}]")
+            exit(1)
+        if permite_negativo:
+            if num < MIN_NEGATIVO or num > MASCARA:
+                print(f"ERRO: valor {op} fora do intervalo [{MIN_NEGATIVO, {MASCARA}}]")
+            if num < 0:
+                num = COMPLEMENTO_DOIS + num
+        else:
+            if num < 0 or num > MASCARA:
+                print(f"ERRO: valor {op} fora do intervalo [0,{MASCARA}]")
                 exit(1)
-        valorMascarado = numeroInicial & MASCARA
-        return valorMascarado
-    if not op:
-        print("ERRO: Jump sem destino.")
+        return num & MASCARA
+    except ValueError:
+        print(f"ERRO: valor {op} não é um número válido")
         exit(1)
-    return op
 
 def flags(jcaez):
     """ aciona as flags do jumper """
@@ -261,7 +218,7 @@ def geraByteCode(instrucao_obj, ram, pos):
         byte1 |= (reg1_num << 2) | reg2_num
     elif instrucao_obj.comando in comandos_data:
         reg_num = regToNum(instrucao_obj.op1)
-        data_value = trataDado(instrucao_obj.op2)
+        data_value = trataDado(instrucao_obj.op2, permite_negativo=True)
         byte1 |= reg_num
         byte2 = data_value    
     elif instrucao_obj.comando in comandos_IO:
@@ -278,7 +235,7 @@ def geraByteCode(instrucao_obj, ram, pos):
         byte1 = instrucao_obj.bytecode
     # Lógica para JMP e Jumps Condicionais (JCAEZ)
     elif instrucao_obj.comando.startswith("J") and instrucao_obj.comando != "JMPR":
-        byte2 = trataDadoJMP(instrucao_obj.op1) # instrucao_obj.op1 deve ser o endereço ou label (resolvido na 2a passagem)
+        byte2 = trataDado(instrucao_obj.op1, permite_negativo=False) # instrucao_obj.op1 deve ser o endereço ou label (resolvido na 2a passagem)
     else:
         print(f"ERRO INTERNO: Comando '{instrucao_obj.comando}' não tratado na geração do bytecode final.")
         exit(1)
@@ -302,13 +259,8 @@ def tamanho_instrucao(instrucao):
         return 2
     return 1
 
-# funcao principal
-def main():
-    """ função principal do programa, faz a montagem """
-    input_file, output_file = init()
-    input_file_content = input_file.readlines()
-    input_file.close()
-
+def primeiraPassagem(input_file_content):
+    labels = {}
     rastreio_pos = 0
 
     # --- PRIMEIRA PASSAGEM ---
@@ -349,8 +301,12 @@ def main():
                     exit(1)
             else:
                 continue
+    return labels
 
-    # --- SEGUNDA PASSAGEM (gera bytecode para as instruções já expandidas) ---
+def segundaPassagem(input_file_content, labels):
+    """ --- SEGUNDA PASSAGEM --- 
+    gera bytecode para as instruções já expandidas)
+    """
     pos = 0
     for linha_str in input_file_content:
         linha_str = linha_str.strip()
@@ -381,6 +337,17 @@ def main():
                     if pos > RAM_SIZE:
                         print(f"ERRO: Código excedeu o tamanho máximo da RAM ({RAM_SIZE} bytes)!")
                         exit(1)
+    return pos
+
+# funcao principal
+def main():
+    """ função principal do programa, faz a montagem """
+    input_file, output_file = init()
+    input_file_content = input_file.readlines()
+    input_file.close()
+
+    labels = primeiraPassagem(input_file_content)
+    pos = segundaPassagem(input_file_content, labels)
     
     salva(ram, pos, RAM_SIZE, output_file)
     print(f"Processado com sucesso, arquivo salvo em {sys.argv[2]}")
