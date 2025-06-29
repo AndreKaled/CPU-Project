@@ -241,6 +241,8 @@ def tamanho_instrucao(instrucao):
     return 1
 
 def primeiraPassagem(input_file_content):
+    """faz a primeira passagem, transforma os labels para um dicionario
+    e salva cada label com seu endereço"""
     labels = {}
     rastreio_pos = 0
 
