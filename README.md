@@ -1,4 +1,5 @@
 # CPU-Project: Montador de CPU de 8 bits em Logisim Evolution
+![imagem do computador](https://github.com/AndreKaled/CPU-Project/blob/main/cpu_8bits.jpg)
 Este projeto consiste na construção de uma CPU de 8 bits e a implementação de um montador (assembler) em Python para uma CPU de 8 bits desenvolvida e simulada no [Logisim Evolution](https://github.com/reds-heig/logisim-evolution). O objetivo principal é facilitar a criação de programas em linguagem assembly para esta CPU, convertendo o código fonte (.asm) em um arquivo de memória (.txt) que pode ser carregado diretamente no Logisim.
 
 ## Visão Geral
